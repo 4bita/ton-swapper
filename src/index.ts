@@ -4,10 +4,12 @@ import {mnemonicToWalletKey} from "@ton/crypto";
 import {configDotenv} from "dotenv";
 import {getBalance} from "./helpers";
 import * as dedust from "./dedust";
+import * as stonfi from "./stonfi";
 import {Currency} from "./types";
 import {
     MAX_JUSDC,
-    MAX_JUSDT, MIN_JETTON_SWAP_AMOUNT,
+    MAX_JUSDT,
+    MIN_JETTON_SWAP_AMOUNT,
     MIN_JUSDC,
     MIN_JUSDT,
     MIN_TON,
@@ -77,15 +79,9 @@ async function handleSwap(tonClient: TonClient, wallet: WalletContractV4) {
         (fromCurrency !== Currency.TON && amount > MIN_JETTON_SWAP_AMOUNT)) {
         console.log(`Swap ${fromCurrency} -> ${toCurrency}. Amount: ${amount}`);
 
-        const res = await dedust.estimateSwapPrise(
-            tonClient,
-            fromCurrency,
-            toCurrency,
-            1_000_000_000n
-        );
-        console.log("Trade fee: ", res.tradeFee)
+        const exchangeApi = await chooseExchange(tonClient, fromCurrency, toCurrency, amount);
 
-        await dedust.swap(
+        await exchangeApi.swap(
             tonClient,
             wallet,
             fromCurrency,
@@ -93,11 +89,29 @@ async function handleSwap(tonClient: TonClient, wallet: WalletContractV4) {
             amount
         )
         console.log("Successfully swapped")
+    } else {
+        console.log("Rebalancing is not required...")
     }
+}
+
+
+async function chooseExchange(tonClient: TonClient, from: Currency, to: Currency, amountIn: bigint) {
+    const dedustFee = await dedust.estimateSwapPrise(tonClient, from, to, amountIn);
+    const stonfiFee = await stonfi.estimateSwapPrise(tonClient, from, to, amountIn);
+
+    if (dedustFee.tradeFee <= stonfiFee.tradeFee) {
+        console.log("Use DeDust api for exchanging")
+        return dedust;
+    }
+    // Use DeDust in all cases for now as StonFi doesn't work as expected. Should be changed in the future.
+    console.log("Use DeDust api for exchanging")
+    return dedust;
 }
 
 
 (() => {
     configDotenv();
-    main().finally(() => console.log("Exiting..."));
+    main()
+        .catch(e => {console.error(`Failed with ${e}`)})
+        .finally(() => console.log("Exiting..."));
 })();
