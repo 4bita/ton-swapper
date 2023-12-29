@@ -3,7 +3,7 @@ This service allows automatically rebalance user tokens such as TON, jUSDT and j
 It leverages DeDust and StoneFi API (+ Orbs api for connection to a Ton node).  
 When user has not enough jUSDT or jUSDC tokens, the service will
 automatically swap Ton reserves and buy necessary jettons. When
-a user has too a lot jetton tokens (specified in index.ts), they
+a user has too a lot jetton tokens (specified in config.ts), they
 will be swapped to TONs.
 
 ## Setup
