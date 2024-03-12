@@ -1,5 +1,5 @@
 import { Asset, Factory, JettonRoot, MAINNET_FACTORY_ADDR, PoolType, ReadinessStatus, VaultJetton } from '@dedust/sdk';
-import { toNano, TonClient, WalletContractV4 } from "@ton/ton";
+import { toNano, TonClient4, WalletContractV4 } from "@ton/ton";
 import { mnemonicToWalletKey } from "@ton/crypto";
 import { JUSDC_ADDRESS, JUSDT_ADDRESS } from "./config";
 import { Currency } from "./types";
@@ -12,7 +12,6 @@ const CurrencyAssets = {
 
 
 export async function swap(
-    tonClient: TonClient,
     wallet: WalletContractV4,
     from: Currency,
     to: Currency,
@@ -20,12 +19,13 @@ export async function swap(
 ){
     const fromAsset = CurrencyAssets[from]
     const toAsset = CurrencyAssets[to]
+    const tonClient = new TonClient4({ endpoint: "https://mainnet-v4.tonhubapi.com" });
     const vault = await getVault(tonClient, fromAsset);
     const pool = await findPool(tonClient, fromAsset, toAsset);
     const keys = await mnemonicToWalletKey(process.env.WALLET_PRIVATE_KEY.split(' '));
     const sender = tonClient.open(wallet).sender(keys.secretKey);
 
-    if(fromAsset.type === 0){
+    if(fromAsset.type === 0 || toAsset.type === 0){
         await vault.sendSwap(sender, {
             poolAddress: pool.address,
             amount: amountIn,
@@ -46,13 +46,13 @@ export async function swap(
 
 
 export async function estimateSwapPrise(
-    tonClient: TonClient,
     from: Currency,
     to: Currency,
     amountIn: bigint
 ) {
     const fromAsset = CurrencyAssets[from]
     const toAsset = CurrencyAssets[to]
+    const tonClient = new TonClient4({ endpoint: "https://mainnet-v4.tonhubapi.com" });
     const pool = await findPool(tonClient, fromAsset, toAsset);
     const { assetOut, amountOut, tradeFee } = await pool.getEstimatedSwapOut(
         { assetIn: fromAsset, amountIn: amountIn }
@@ -61,9 +61,8 @@ export async function estimateSwapPrise(
 }
 
 
-async function findPool(tonClient: TonClient, fromAsset: Asset, toAsset: Asset) {
+async function findPool(tonClient: TonClient4, fromAsset: Asset, toAsset: Asset) {
     const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
-
     const poolType = (fromAsset.type === 0 || toAsset.type === 0) ? PoolType.VOLATILE : PoolType.STABLE
     const pool = tonClient.open(await factory.getPool(poolType, [fromAsset, toAsset]));
 
@@ -78,7 +77,7 @@ async function findPool(tonClient: TonClient, fromAsset: Asset, toAsset: Asset) 
 }
 
 
-async function getVault(tonClient: TonClient, asset: Asset) {
+async function getVault(tonClient: TonClient4, asset: Asset) {
     const factory = tonClient.open(Factory.createFromAddress(MAINNET_FACTORY_ADDR));
     let vault;
     if (asset.type === 0){

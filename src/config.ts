@@ -1,4 +1,5 @@
-import { Address } from "@ton/ton";
+import { Address } from "@ton/core";
+import { PrefferedExchange } from "./types";
 
 export const JUSDT_ADDRESS = Address.parse("EQBynBO23ywHy_CgarY9NK9FTz0yDsG82PtcbSTQgGoXwiuA");
 export const JUSDC_ADDRESS = Address.parse("EQB-MPwrd1G6WKNkLz_VnV6WqBDd142KMQv-g1O-8QUA3728");
@@ -20,3 +21,5 @@ export const MIN_TON = 10_000_000_000n
 
 export const MIN_TON_SWAP_AMOUNT = 2_000_000_000n
 export const MIN_JETTON_SWAP_AMOUNT = 5_000_000n
+
+export const PREFFERED_EXCHANGE = PrefferedExchange.DeDust

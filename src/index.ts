@@ -1,11 +1,11 @@
-import {getHttpEndpoint} from "@orbs-network/ton-access";
-import {TonClient, WalletContractV4} from "@ton/ton";
-import {mnemonicToWalletKey} from "@ton/crypto";
-import {configDotenv} from "dotenv";
-import {getBalance} from "./helpers";
+import { getHttpEndpoint } from "@orbs-network/ton-access";
+import { TonClient, WalletContractV4 } from "@ton/ton";
+import { mnemonicToWalletKey } from "@ton/crypto";
+import { configDotenv } from "dotenv";
+import { getBalance, sleepMs } from "./helpers";
 import * as dedust from "./dedust";
 import * as stonfi from "./stonfi";
-import {Currency} from "./types";
+import { Currency, PrefferedExchange } from "./types";
 import {
     MAX_JUSDC,
     MAX_JUSDT,
@@ -14,15 +14,27 @@ import {
     MIN_JUSDT,
     MIN_TON,
     MIN_TON_SWAP_AMOUNT,
+    PREFFERED_EXCHANGE,
     TARGET_JUSDC,
     TARGET_JUSDT
 } from "./config";
 
-const HOUR = 3_600_000
-const TON_USD_SCALE = 500n
+const MINUTELY = 60_000
+const TON_USD_SCALE = 270n
 
 
 async function main() {
+    await handleSwap();
+    setInterval(() => {
+        handleSwap().catch((e) => {
+            console.log(`Failed with error: ${e}`);
+        });
+    }, MINUTELY);
+}
+
+
+async function handleSwap() {
+    //Use Orbs RPC provider
     const endpoint = await getHttpEndpoint();
     const tonClient = new TonClient({ endpoint });
     const keys = await mnemonicToWalletKey(
@@ -32,22 +44,11 @@ async function main() {
         workchain: 0,
         publicKey: keys.publicKey,
     });
-
-    await handleSwap(tonClient, wallet);
-    setInterval(() => {
-        handleSwap(tonClient, wallet).catch((e) => {
-            console.log(`Failed with error: ${e}`);
-        });
-    }, HOUR);
-}
-
-
-async function handleSwap(tonClient: TonClient, wallet: WalletContractV4) {
     const myBalance = await getBalance(tonClient, wallet);
     console.log("My balance: ", myBalance);
 
     if (myBalance.ton < MIN_TON) {
-        console.log("Not enough TON balance");
+        console.log(`Not enough TON balance. To handle swaps at least ${MIN_TON} Ton required`);
         return;
     }
     let fromCurrency = Currency.TON;
@@ -79,33 +80,48 @@ async function handleSwap(tonClient: TonClient, wallet: WalletContractV4) {
         (fromCurrency !== Currency.TON && amount > MIN_JETTON_SWAP_AMOUNT)) {
         console.log(`Swap ${fromCurrency} -> ${toCurrency}. Amount: ${amount}`);
 
-        const exchangeApi = await chooseExchange(tonClient, fromCurrency, toCurrency, amount);
+        const exchangeApi = await chooseExchange(fromCurrency, toCurrency, amount);
 
-        await exchangeApi.swap(
-            tonClient,
-            wallet,
-            fromCurrency,
-            toCurrency,
-            amount
-        )
-        console.log("Successfully swapped")
+        for (let i = 0; i < 3; i++) {
+            try {
+                await exchangeApi.swap(
+                    wallet,
+                    fromCurrency,
+                    toCurrency,
+                    amount
+                );
+                console.log("Successfully swapped");
+                break;
+            } catch (e) {
+                console.log("Swap failed. Try to retry it one more time");
+                await sleepMs(1000);
+            }
+        }
     } else {
-        console.log("Rebalancing is not required...")
+        console.log("Rebalancing is not required...");
     }
 }
 
 
-async function chooseExchange(tonClient: TonClient, from: Currency, to: Currency, amountIn: bigint) {
-    const dedustFee = await dedust.estimateSwapPrise(tonClient, from, to, amountIn);
-    const stonfiFee = await stonfi.estimateSwapPrise(tonClient, from, to, amountIn);
+async function chooseExchange(from: Currency, to: Currency, amountIn: bigint) {
+    // @ts-ignore
+    if (PREFFERED_EXCHANGE === PrefferedExchange.DeDust) {
+        console.log("Use DeDust api for exchanging as it is set as preferred one");
+        return dedust
+    }
+    if (PREFFERED_EXCHANGE === PrefferedExchange.StonFi) {
+        console.log("Use Ston.fi api for exchanging as it is set as preferred one.");
+        return stonfi
+    }
 
+    const dedustFee = await dedust.estimateSwapPrise(from, to, amountIn);
+    const stonfiFee = await stonfi.estimateSwapPrise(from, to, amountIn);
     if (dedustFee.tradeFee <= stonfiFee.tradeFee) {
-        console.log("Use DeDust api for exchanging")
+        console.log("Use DeDust api for exchanging");
         return dedust;
     }
-    // Use DeDust in all cases for now as StonFi doesn't work as expected. Should be changed in the future.
-    console.log("Use DeDust api for exchanging")
-    return dedust;
+    console.log("Use Ston.fi api for exchanging");
+    return stonfi;
 }
 
 

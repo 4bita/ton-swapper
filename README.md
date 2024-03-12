@@ -7,8 +7,8 @@ a user has too a lot jetton tokens (specified in config.ts), they
 will be swapped to TONs.
 
 ## Setup
-- Set necessary configs (such as WALLET_PRIVATE_KEY and TONAPI_KEY) in .env file at the root
+- Create .env file and set WALLET_PRIVATE_KEY there
 - Install app dependencies: `npm i`
 
-## Start bot
+## Start swapper service
 `npm run start`

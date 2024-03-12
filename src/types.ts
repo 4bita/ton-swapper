@@ -9,3 +9,9 @@ export enum Currency {
     JUSDT = "jUSDT",
     JUSDC = "jUSDC"
 }
+
+export enum PrefferedExchange {
+    StonFi,
+    DeDust,
+    BestRate
+}
