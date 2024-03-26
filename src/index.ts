@@ -1,5 +1,5 @@
-import { getHttpEndpoint } from "@orbs-network/ton-access";
-import { TonClient, WalletContractV4 } from "@ton/ton";
+import { getHttpEndpoint, getHttpV4Endpoint } from "@orbs-network/ton-access";
+import { TonClient, TonClient4, WalletContractV4 } from "@ton/ton";
 import { mnemonicToWalletKey } from "@ton/crypto";
 import { configDotenv } from "dotenv";
 import { getBalance, sleepMs } from "./helpers";
@@ -20,7 +20,8 @@ import {
 } from "./config";
 
 const MINUTELY = 60_000
-const TON_USD_SCALE = 270n
+const TON_PRICE_IN_USD = 5.05
+const TON_USD_SCALE = BigInt(Math.floor(1000 / TON_PRICE_IN_USD))
 
 
 async function main() {
@@ -34,9 +35,14 @@ async function main() {
 
 
 async function handleSwap() {
-    //Use Orbs RPC provider
-    const endpoint = await getHttpEndpoint();
-    const tonClient = new TonClient({ endpoint });
+    // Use Orbs RPC provider
+    // V2 is used to get jetton balance
+    const endpointV2 = await getHttpEndpoint();
+    const tonClientV2 = new TonClient({ endpoint: endpointV2 });
+    // V4 has to be used for exchanges API
+    const endpointV4 = await getHttpV4Endpoint();
+    const tonClientV4 = new TonClient4({ endpoint: endpointV4 });
+
     const keys = await mnemonicToWalletKey(
         process.env.WALLET_PRIVATE_KEY.split(" ")
     );
@@ -44,7 +50,7 @@ async function handleSwap() {
         workchain: 0,
         publicKey: keys.publicKey,
     });
-    const myBalance = await getBalance(tonClient, wallet);
+    const myBalance = await getBalance(tonClientV2, wallet);
     console.log("My balance: ", myBalance);
 
     if (myBalance.ton < MIN_TON) {
@@ -54,7 +60,8 @@ async function handleSwap() {
     let fromCurrency = Currency.TON;
     let toCurrency = Currency.TON;
     let amount = 0n;
-    if (myBalance.usdt > MAX_JUSDT) {
+    if (myBalance.
+        usdt > MAX_JUSDT) {
         console.log("Too a lot of USDT. Swap surplus to TON.");
         fromCurrency = Currency.JUSDT;
         toCurrency = Currency.TON;
@@ -80,12 +87,14 @@ async function handleSwap() {
         (fromCurrency !== Currency.TON && amount > MIN_JETTON_SWAP_AMOUNT)) {
         console.log(`Swap ${fromCurrency} -> ${toCurrency}. Amount: ${amount}`);
 
-        const exchangeApi = await chooseExchange(fromCurrency, toCurrency, amount);
+        const exchangeApi = await chooseExchange(tonClientV4, fromCurrency, toCurrency, amount);
 
         for (let i = 0; i < 3; i++) {
             try {
                 await exchangeApi.swap(
+                    tonClientV4,
                     wallet,
+                    keys,
                     fromCurrency,
                     toCurrency,
                     amount
@@ -103,21 +112,20 @@ async function handleSwap() {
 }
 
 
-async function chooseExchange(from: Currency, to: Currency, amountIn: bigint) {
-    // @ts-ignore
-    if (PREFFERED_EXCHANGE === PrefferedExchange.DeDust) {
+async function chooseExchange(tonClient: TonClient4, from: Currency, to: Currency, amountIn: bigint) {
+    if (PREFFERED_EXCHANGE.valueOf() === PrefferedExchange.DeDust) {
         console.log("Use DeDust api for exchanging as it is set as preferred one");
-        return dedust
+        return dedust;
     }
-    if (PREFFERED_EXCHANGE === PrefferedExchange.StonFi) {
+    if (PREFFERED_EXCHANGE.valueOf() === PrefferedExchange.StonFi) {
         console.log("Use Ston.fi api for exchanging as it is set as preferred one.");
-        return stonfi
+        return stonfi;
     }
 
-    const dedustFee = await dedust.estimateSwapPrise(from, to, amountIn);
+    const dedustFee = await dedust.estimateSwapPrise(tonClient, from, to, amountIn);
     const stonfiFee = await stonfi.estimateSwapPrise(from, to, amountIn);
     if (dedustFee.tradeFee <= stonfiFee.tradeFee) {
-        console.log("Use DeDust api for exchanging");
+        console.log("Use DeDust api for exchanging. Estimated fee: ", dedustFee.tradeFee);
         return dedust;
     }
     console.log("Use Ston.fi api for exchanging");
@@ -127,7 +135,5 @@ async function chooseExchange(from: Currency, to: Currency, amountIn: bigint) {
 
 (() => {
     configDotenv();
-    main()
-        .catch(e => {console.error(`Failed with ${e}`)})
-        .finally(() => console.log("Exiting..."));
+    main().catch(e => {console.error(`Failed with ${e}`)});
 })();

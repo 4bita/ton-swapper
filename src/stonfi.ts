@@ -1,9 +1,9 @@
 import TonWeb from 'tonweb';
-import { Cell, internal, TonClient, TonClient4, WalletContractV4 } from "@ton/ton";
-import { Router, ROUTER_REVISION, ROUTER_REVISION_ADDRESS} from '@ston-fi/sdk';
+import { Cell, internal, TonClient4, WalletContractV4 } from "@ton/ton";
+import { Router, ROUTER_REVISION, ROUTER_REVISION_ADDRESS } from '@ston-fi/sdk';
 import { JUSDC_ADDRESS, JUSDT_ADDRESS, PTON_ADDRESS } from "./config";
 import { Currency } from "./types";
-import { mnemonicToWalletKey } from "@ton/crypto";
+import { KeyPair } from "@ton/crypto";
 
 const CurrencyAssets = {
     [Currency.TON]: PTON_ADDRESS,
@@ -13,7 +13,9 @@ const CurrencyAssets = {
 
 
 export async function swap(
+    tonClient: TonClient4,
     wallet: WalletContractV4,
+    keyPair: KeyPair,
     from: Currency,
     to: Currency,
     amountIn: bigint
@@ -35,14 +37,12 @@ export async function swap(
         minAskAmount: new TonWeb.utils.BN(1),
     });
 
-    const tonClient = new TonClient4({ endpoint: "https://mainnet-v4.tonhubapi.com" });
     const walletContract = tonClient.open(wallet);
     const seqno = await walletContract.getSeqno();
-    const keys = await mnemonicToWalletKey(process.env.WALLET_PRIVATE_KEY.split(' '));
 
     await walletContract.sendTransfer({
         seqno,
-        secretKey: keys.secretKey,
+        secretKey: keyPair.secretKey,
         messages: [internal({
             value: params.gasAmount,
             to: params.to.toString(),

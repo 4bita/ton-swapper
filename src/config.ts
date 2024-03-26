@@ -7,19 +7,19 @@ export const PTON_ADDRESS = Address.parse("EQCM3B12QK1e4yZSf8GtBRT0aLMNyEsBc_DhV
 
 
 // USDT
-export const MIN_JUSDT = 5_000_000n
-export const TARGET_JUSDT = 10_000_000n
-export const MAX_JUSDT = 20_000_000n
+export const MIN_JUSDT = 5_000_000n;
+export const TARGET_JUSDT = 10_000_000n;
+export const MAX_JUSDT = 20_000_000n;
 
 // USDC
-export const MIN_JUSDC = 5_000_000n
-export const TARGET_JUSDC = 10_000_000n
-export const MAX_JUSDC = 20_000_000n
+export const MIN_JUSDC = 5_000_000n;
+export const TARGET_JUSDC = 10_000_000n;
+export const MAX_JUSDC = 20_000_000n;
 
 // TON
-export const MIN_TON = 10_000_000_000n
+export const MIN_TON = 10_000_000_000n;
 
-export const MIN_TON_SWAP_AMOUNT = 2_000_000_000n
-export const MIN_JETTON_SWAP_AMOUNT = 5_000_000n
+export const MIN_TON_SWAP_AMOUNT = 2_000_000_000n;
+export const MIN_JETTON_SWAP_AMOUNT = 5_000_000n;
 
-export const PREFFERED_EXCHANGE = PrefferedExchange.DeDust
+export const PREFFERED_EXCHANGE = PrefferedExchange.DeDust;
